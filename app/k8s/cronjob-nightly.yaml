@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: northstar-nightly
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: northstar-nightly
+              image: ghcr.io/example/northstar:latest
+              command: ["poetry", "run", "python", "-m", "src.jobs.nightly"]
+          restartPolicy: OnFailure

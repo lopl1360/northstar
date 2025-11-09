@@ -1,0 +1,4 @@
+runtime: python311
+service: northstar
+instance_class: F4
+entrypoint: poetry run python -m src.jobs.nightly

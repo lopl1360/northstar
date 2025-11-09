@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "northstar"
+version = "0.1.0"
+description = ""
+authors = ["Northstar Team <dev@example.com>"]
+readme = "README.md"
+packages = [{ include = "src", from = "." }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "*"
+pandas = "*"
+numpy = "*"
+scipy = "*"
+redis = "*"
+tenacity = "*"
+pydantic = "*"
+sqlalchemy = "*"
+pymysql = "*"
+python-telegram-bot = "21.*"
+
+[tool.poetry.scripts]
+nightly = "src.jobs.nightly:main"
+refresh = "src.jobs.refresh_intraday:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
