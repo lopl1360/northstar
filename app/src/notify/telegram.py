@@ -1,152 +1,101 @@
-"""Utility helpers for sending Telegram notifications.
-
-The real production environment would use the Telegram HTTP API.  For the
-purposes of the kata we implement a small helper that behaves like the real
-integration while remaining resilient when the credentials are missing or the
-network is unavailable.  The helper will therefore never raise an exception –
-instead it records the failure in the logs and writes the attempted message to
-an "outbox" text file for later inspection.
-"""
+"""Telegram notification helpers."""
 
 from __future__ import annotations
 
-import json
 import logging
+import math
 import os
-from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
-from typing import Optional
-
-import requests
+from datetime import date
+import pandas as pd
+from telegram import Bot
+from telegram.error import TelegramError
 
 LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class TelegramSettings:
-    """Configuration needed to talk to the Telegram API."""
-
-    token: Optional[str]
-    chat_id: Optional[str]
-    timeout: float = 5.0
-    dry_run: bool = True
-    outbox_path: Path | None = None
+def _coerce_float(value: object) -> float:
+    try:
+        if value is None:
+            return math.nan
+        return float(value)
+    except (TypeError, ValueError):
+        return math.nan
 
 
-class TelegramNotifier:
-    """Small utility for posting messages to Telegram.
+def _format_pick_lines(rank: int, row: pd.Series) -> tuple[str, str, str]:
+    symbol = str(row.get("symbol", "?"))
 
-    Parameters
-    ----------
-    token:
-        Bot token provided by BotFather.
-    chat_id:
-        Identifier for the channel or chat to post to.
-    timeout:
-        Number of seconds to wait for the HTTP request to complete.
-    dry_run:
-        When ``True`` (the default) messages are not sent to Telegram.  This
-        is useful for development environments where network access is
-        intentionally disabled.  The attempted message is still persisted to
-        the outbox file so that the user can review the payload.
-    outbox_path:
-        Optional location where attempted messages should be appended.  When
-        omitted the helper simply logs the message.
-    """
+    price = _coerce_float(row.get("price"))
+    target = _coerce_float(row.get("target_price"))
+    target_return = _coerce_float(row.get("target_return"))
+    stop = _coerce_float(row.get("stop_loss"))
+    stop_return = _coerce_float(row.get("stop_return"))
+    dcf_upside = _coerce_float(row.get("dcf_upside"))
+    ev_ebit = _coerce_float(row.get("ev_ebit"))
+    sector_median = _coerce_float(row.get("sector_median_ev_ebit"))
+    roe = _coerce_float(row.get("roe"))
+    sma200 = _coerce_float(row.get("sma_200", row.get("sma200")))
 
-    _API_BASE_URL = "https://api.telegram.org"
+    if not math.isnan(price) and not math.isnan(sma200):
+        sma_flag = "✅ Above" if price >= sma200 else "⚠️ Below"
+    else:
+        sma_flag = "ℹ️ N/A"
 
-    def __init__(
-        self,
-        token: Optional[str],
-        chat_id: Optional[str],
-        *,
-        timeout: float = 5.0,
-        dry_run: Optional[bool] = None,
-        outbox_path: Path | None = None,
-        session: Optional[requests.Session] = None,
-    ) -> None:
-        env_dry_run = os.getenv("TELEGRAM_DRY_RUN")
-        if dry_run is None:
-            dry_run = env_dry_run is None or env_dry_run not in {"0", "false", "False"}
+    def fmt(value: float, pattern: str) -> str:
+        return pattern.format(value) if not math.isnan(value) else "N/A"
 
-        self.settings = TelegramSettings(
-            token=token,
-            chat_id=chat_id,
-            timeout=timeout,
-            dry_run=dry_run,
-            outbox_path=outbox_path,
-        )
-        self._session = session or requests.Session()
+    price_text = fmt(price, "{:.2f}")
+    target_text = fmt(target, "{:.2f}")
+    target_pct = target_return * 100 if not math.isnan(target_return) else math.nan
+    target_pct_text = fmt(target_pct, "{:+.1f}")
+    stop_text = fmt(stop, "{:.2f}")
+    stop_pct = stop_return * 100 if not math.isnan(stop_return) else math.nan
+    stop_pct_text = fmt(stop_pct, "{:.1f}")
+    dcf_text = fmt(dcf_upside, "{:+.0%}")
+    ev_ebit_text = fmt(ev_ebit, "{:.1f}")
+    sector_median_text = fmt(sector_median, "{:.1f}")
+    roe_pct = roe * 100 if not math.isnan(roe) else math.nan
+    roe_text = fmt(roe_pct, "{:.0f}")
 
-    # ------------------------------------------------------------------
-    # Public API
-    def send_message(self, text: str) -> bool:
-        """Attempt to send ``text`` to Telegram.
+    line_one = f"{rank}) {symbol} | Price {price_text}"
+    line_two = (
+        f"   Target {target_text}  ({target_pct_text}%)   "
+        f"Stop {stop_text} ({stop_pct_text}%)"
+    )
+    line_three = (
+        f"   DCF {dcf_text} | EV/EBIT {ev_ebit_text} vs sector {sector_median_text} | "
+        f"ROE {roe_text}% | SMA200 {sma_flag}"
+    )
 
-        Returns ``True`` when the message was accepted by Telegram, ``False``
-        otherwise.  Any failures are logged and persisted to the outbox.
-        """
-
-        if not text:
-            LOGGER.info("event=telegram_send status=skipped reason=empty_message")
-            return False
-
-        self._persist_message(text)
-
-        if not self.settings.token or not self.settings.chat_id:
-            LOGGER.info(
-                "event=telegram_send status=skipped reason=missing_credentials length=%d",
-                len(text),
-            )
-            return False
-
-        if self.settings.dry_run:
-            LOGGER.info(
-                "event=telegram_send status=dry_run length=%d chat_id=%s",
-                len(text),
-                self.settings.chat_id,
-            )
-            return False
-
-        url = f"{self._API_BASE_URL}/bot{self.settings.token}/sendMessage"
-        payload = {"chat_id": self.settings.chat_id, "text": text}
-
-        try:
-            response = self._session.post(url, json=payload, timeout=self.settings.timeout)
-            response.raise_for_status()
-            data = response.json()
-            if isinstance(data, dict) and data.get("ok"):
-                LOGGER.info(
-                    "event=telegram_send status=success length=%d chat_id=%s",
-                    len(text),
-                    self.settings.chat_id,
-                )
-                return True
-            LOGGER.warning(
-                "event=telegram_send status=unexpected_response payload=%s",
-                json.dumps(data, ensure_ascii=False),
-            )
-        except Exception as exc:  # pragma: no cover - exercised during runtime
-            LOGGER.warning("event=telegram_send status=failed error=%s", exc)
-
-        return False
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    def _persist_message(self, message: str) -> None:
-        path = self.settings.outbox_path
-        if path is None:
-            return
-
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-            with path.open("a", encoding="utf-8") as handle:
-                handle.write(f"{timestamp} {message}\n")
-        except OSError as exc:  # pragma: no cover - defensive guard
-            LOGGER.warning("event=telegram_outbox status=failed error=%s", exc)
+    return line_one, line_two, line_three
 
 
-__all__ = ["TelegramNotifier", "TelegramSettings"]
+def _build_message(run_date: date, picks: pd.DataFrame | None) -> str:
+    lines = [f"📈 Daily ideas — {run_date.isoformat()}"]
+
+    if picks is None or picks.empty:
+        lines.append("No ideas today.")
+        return "\n".join(lines)
+
+    for rank, (_, row) in enumerate(picks.iterrows(), start=1):
+        lines.extend(_format_pick_lines(rank, row))
+
+    return "\n".join(lines)
+
+
+def send_daily_message(run_date: date, picks_df: pd.DataFrame | None) -> None:
+    """Send the formatted daily message to Telegram."""
+
+    token = os.environ["TELEGRAM_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+
+    bot = Bot(token=token)
+    message = _build_message(run_date, picks_df)
+
+    try:
+        bot.send_message(chat_id=chat_id, text=message)
+    except TelegramError as exc:  # pragma: no cover - relies on network failures
+        LOGGER.error("event=telegram_send status=failed error=%s", exc)
+
+
+__all__ = ["send_daily_message"]

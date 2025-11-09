@@ -30,7 +30,7 @@ from ..features.multiples import compute_multiple_scores
 from ..features.quality import compute_quality_scores
 from ..features.technicals import atr14, sma
 from ..models.valuation import mini_dcf
-from ..notify.telegram import TelegramNotifier
+from ..notify.telegram import send_daily_message
 from ..picks.selector import select
 from ..ranking.scorer import momentum_penalty, score as composite_score
 
@@ -314,21 +314,8 @@ def _write_csv(path: Path, rows: List[Mapping[str, object]]) -> None:
     frame.to_csv(path, index=False)
 
 
-def _send_telegram(today: date, picks: pd.DataFrame, notifier: TelegramNotifier) -> None:
-    lines = [f"Nightly Picks – {today.isoformat()}"]
-    if picks.empty:
-        lines.append("No qualifying selections today.")
-    else:
-        for rank, (_, row) in enumerate(picks.iterrows(), start=1):
-            symbol = row.get("symbol", "?")
-            sector = row.get("sector", "Unknown")
-            target = float(row.get("target_price", float("nan")))
-            stop = float(row.get("stop_loss", float("nan")))
-            composite = float(row.get("composite_score", float("nan")))
-            lines.append(
-                f"{rank}. {symbol} ({sector}) target={target:.2f} stop={stop:.2f} score={composite:.2f}"
-            )
-    notifier.send_message("\n".join(lines))
+def _send_telegram(today: date, picks: pd.DataFrame) -> None:
+    send_daily_message(today, picks)
 
 
 def main() -> None:
@@ -433,12 +420,7 @@ def main() -> None:
     _write_csv(picks_path, pick_rows)
     LOGGER.info("event=write_csv table=picks rows=%d path=%s", len(pick_rows), picks_path)
 
-    notifier = TelegramNotifier(
-        os.getenv("TELEGRAM_TOKEN"),
-        os.getenv("TELEGRAM_CHAT_ID"),
-        outbox_path=output_dir / "telegram_outbox.log",
-    )
-    _send_telegram(today, picks, notifier)
+    _send_telegram(today, picks)
     LOGGER.info(
         "event=nightly status=completed universe=%d metrics=%d picks=%d",
         len(universe),
