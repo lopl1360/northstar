@@ -1,0 +1,1 @@
+"""Northstar application package."""
