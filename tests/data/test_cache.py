@@ -1,12 +1,8 @@
 import json
-import sys
-from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
-
-from data import cache  # noqa: E402
+from src.data import cache
 
 
 class FakeRedis:

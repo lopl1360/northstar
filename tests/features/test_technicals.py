@@ -1,13 +1,8 @@
 """Tests for technical indicator helpers."""
 
-import sys
-from pathlib import Path
-
 import pandas as pd
 
-sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
-
-from features.technicals import atr14, sma  # noqa: E402
+from src.features.technicals import atr14, sma
 
 
 def test_sma_simple_sequence():
