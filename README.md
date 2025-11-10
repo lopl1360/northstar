@@ -1,5 +1,7 @@
 # northstar
 
+![tests](https://github.com/OWNER/REPO/actions/workflows/tests.yml/badge.svg)
+
 ## Command line utilities
 
 Run ad-hoc calculations or integration checks directly from the project root after installing dependencies inside `app/`:
