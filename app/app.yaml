@@ -1,4 +1,85 @@
-runtime: python311
-service: northstar
-instance_class: F4
-entrypoint: poetry run python -m src.jobs.nightly
+name: northstar
+region: tor
+jobs:
+  - name: nightly
+    source_dir: .
+    dockerfile_path: Dockerfile
+    run_command: "poetry run python -m src.jobs.nightly"
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    schedule:
+      type: cron
+      cron: "30 13 * * 1-5"
+      timezone: America/Vancouver
+    envs:
+      - key: FINNHUB_TOKEN
+        type: SECRET
+        scope: RUN_TIME
+      - key: TWELVEDATA_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_HOST
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_PORT
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_DB
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_USER
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_PASSWORD
+        type: SECRET
+        scope: RUN_TIME
+      - key: REDIS_URL
+        type: SECRET
+        scope: RUN_TIME
+      - key: TELEGRAM_TOKEN
+        type: SECRET
+        scope: RUN_TIME
+      - key: TELEGRAM_CHAT_ID
+        type: SECRET
+        scope: RUN_TIME
+  - name: refresh
+    source_dir: .
+    dockerfile_path: Dockerfile
+    run_command: "poetry run python -m src.jobs.refresh_intraday"
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    schedule:
+      type: cron
+      cron: "0 * * * *"
+      timezone: America/Vancouver
+    envs:
+      - key: FINNHUB_TOKEN
+        type: SECRET
+        scope: RUN_TIME
+      - key: TWELVEDATA_KEY
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_HOST
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_PORT
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_DB
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_USER
+        type: SECRET
+        scope: RUN_TIME
+      - key: MYSQL_PASSWORD
+        type: SECRET
+        scope: RUN_TIME
+      - key: REDIS_URL
+        type: SECRET
+        scope: RUN_TIME
+      - key: TELEGRAM_TOKEN
+        type: SECRET
+        scope: RUN_TIME
+      - key: TELEGRAM_CHAT_ID
+        type: SECRET
+        scope: RUN_TIME
