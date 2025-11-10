@@ -37,6 +37,30 @@ The application configuration is entirely driven by environment variables. All v
 * Tail the structured logs to confirm fetch batches completed and Telegram send succeeded (`event=nightly status=completed`).
 * If Redis is running locally, verify the job didn’t leave stuck rate-limit keys by checking `redis-cli KEYS rate_limit:*`.
 
+## Ad-hoc CLI commands
+
+Northstar exposes a lightweight CLI for one-off calculations and integration tests. Ensure dependencies are installed (`cd app && poetry install`) and required environment variables are loaded before invoking the commands.
+
+* Calculate a single ticker snapshot with Finnhub/TwelveData data and console output:
+
+  ```bash
+  poetry run python -m src.cli calc --symbol KXS.TO
+  ```
+
+* Run the same calculation while pushing the bullet summary to Telegram:
+
+  ```bash
+  poetry run calc --symbol AAPL --send-telegram
+  ```
+
+* Verify Telegram credentials independently of the calc workflow:
+
+  ```bash
+  poetry run tgtest --text "Ping"
+  ```
+
+The `calc` command accepts `--ds YYYY-MM-DD` to evaluate historical contexts and `--verbose` for raw payloads, while `tg-test` falls back to a green-check confirmation when `--text` is omitted.【F:app/src/cli.py†L37-L302】
+
 ## Running the nightly job in Docker
 
 1. Build the image from the `app/` directory: `docker build -t northstar-nightly app` (the Dockerfile installs Poetry and sets the default command to `poetry run nightly`).【F:app/Dockerfile†L1-L33】
