@@ -65,14 +65,22 @@ def _rate_limit_key(key: str) -> str:
 
 
 @contextlib.contextmanager
-def rate_limiter(key: str, max_calls_per_minute: int) -> Generator[None, None, None]:
+def rate_limiter(
+    key: str,
+    max_calls: int,
+    *,
+    window_seconds: int = _RATE_LIMIT_WINDOW_SECONDS,
+) -> Generator[None, None, None]:
     """Context manager enforcing a simple Redis-backed rate limit.
 
-    The limiter tracks the number of entries within the previous 60 seconds and
+    The limiter tracks the number of entries within ``window_seconds`` and
     sleeps until the window resets when the limit has been reached.
     """
-    if max_calls_per_minute <= 0:
-        raise ValueError("max_calls_per_minute must be greater than zero")
+
+    if max_calls <= 0:
+        raise ValueError("max_calls must be greater than zero")
+    if window_seconds <= 0:
+        raise ValueError("window_seconds must be greater than zero")
 
     client = get_client()
     storage_key = _rate_limit_key(key)
@@ -80,12 +88,12 @@ def rate_limiter(key: str, max_calls_per_minute: int) -> Generator[None, None, N
     while True:
         count = client.incr(storage_key)
         if count == 1:
-            client.expire(storage_key, _RATE_LIMIT_WINDOW_SECONDS)
-        if count <= max_calls_per_minute:
+            client.expire(storage_key, window_seconds)
+        if count <= max_calls:
             break
         client.decr(storage_key)
         ttl = client.ttl(storage_key)
-        sleep_time = ttl if ttl and ttl > 0 else _RATE_LIMIT_WINDOW_SECONDS
+        sleep_time = ttl if ttl and ttl > 0 else window_seconds
         time.sleep(sleep_time)
 
     try:

@@ -88,11 +88,11 @@ def test_rate_limiter_waits_when_limit_reached(fake_client, monkeypatch):
 
     monkeypatch.setattr(cache.time, "sleep", fake_sleep)
 
-    with cache.rate_limiter("api", max_calls_per_minute=2):
+    with cache.rate_limiter("api", max_calls=2):
         pass
-    with cache.rate_limiter("api", max_calls_per_minute=2):
+    with cache.rate_limiter("api", max_calls=2):
         pass
-    with cache.rate_limiter("api", max_calls_per_minute=2):
+    with cache.rate_limiter("api", max_calls=2):
         pass
 
     assert sleep_calls == [cache._RATE_LIMIT_WINDOW_SECONDS]
