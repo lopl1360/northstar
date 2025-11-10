@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from collections import Counter
+from datetime import datetime
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -156,6 +157,30 @@ class FinnhubClient:
 
         params = {"symbol": symbol}
         return self._request("/calendar/earnings", params, rate_limit_key="earnings")
+
+    def get_company_profile(self, symbol: str) -> Any:
+        """Return the basic company profile information for ``symbol``."""
+
+        params = {"symbol": symbol}
+        return self._request("/stock/profile2", params, rate_limit_key="profile")
+
+    def get_stock_candles(
+        self,
+        symbol: str,
+        *,
+        start: datetime,
+        end: datetime,
+        resolution: str = "D",
+    ) -> Any:
+        """Return OHLC candle data for ``symbol`` between ``start`` and ``end``."""
+
+        params = {
+            "symbol": symbol,
+            "resolution": resolution,
+            "from": int(start.timestamp()),
+            "to": int(end.timestamp()),
+        }
+        return self._request("/stock/candle", params, rate_limit_key="candle")
 
     # ------------------------------------------------------------------
     # Internal helpers

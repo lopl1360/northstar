@@ -127,6 +127,15 @@ def _compute_targets(frame: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def compute_targets(frame: pd.DataFrame) -> pd.DataFrame:
+    """Public wrapper returning ``frame`` with target and stop columns."""
+
+    if frame is None or frame.empty:
+        return pd.DataFrame(columns=["target_price", "stop_loss", "target_return", "stop_return"])
+
+    return _compute_targets(frame)
+
+
 def _passes_entry_filters(row: pd.Series, config: SelectionConfig) -> bool:
     """Return ``True`` if ``row`` satisfies the entry criteria."""
 
@@ -260,6 +269,7 @@ def select(
 
 __all__ = [
     "SelectionConfig",
+    "compute_targets",
     "multiples_reversion_price",
     "select",
     "swing_low_support",

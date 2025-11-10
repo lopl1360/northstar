@@ -22,6 +22,9 @@ python-telegram-bot = "21.*"
 [tool.poetry.scripts]
 nightly = "src.jobs.nightly:main"
 refresh = "src.jobs.refresh_intraday:main"
+cli = "python -m src.cli"
+calc = "python -m src.cli calc"
+tgtest = "python -m src.cli tg-test"
 
 [build-system]
 requires = ["poetry-core"]

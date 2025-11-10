@@ -98,4 +98,15 @@ def send_daily_message(run_date: date, picks_df: pd.DataFrame | None) -> None:
         LOGGER.error("event=telegram_send status=failed error=%s", exc)
 
 
-__all__ = ["send_daily_message"]
+def send_text_message(text: str) -> str:
+    """Send ``text`` to the configured Telegram chat and return the message id."""
+
+    token = os.environ["TELEGRAM_TOKEN"]
+    chat_id = os.environ["TELEGRAM_CHAT_ID"]
+
+    bot = Bot(token=token)
+    message = bot.send_message(chat_id=chat_id, text=text)
+    return str(message.message_id)
+
+
+__all__ = ["send_daily_message", "send_text_message"]
