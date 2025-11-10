@@ -25,6 +25,7 @@ refresh = "src.jobs.refresh_intraday:main"
 cli = "python -m src.cli"
 calc = "python -m src.cli calc"
 tgtest = "python -m src.cli tg-test"
+pytest = "pytest:main"
 
 [build-system]
 requires = ["poetry-core"]
